@@ -7,13 +7,14 @@ struct NoteView: View {
 
     let noteID: Note.ID
 
-    @State private var quickAddText: String = ""
-    @FocusState private var quickAddFocused: Bool
+    @State private var entryText: String = ""
+    @FocusState private var entryFocused: Bool
 
     @State private var isCollapsed: Bool = false
     @State private var savedExpandedFrame: CGRect?
-    @State private var headerHeight: CGFloat = 0
     @State private var resolvedWindow: AnyObject?
+    @State private var windowInteractions = WindowInteractionsInstaller()
+    @State private var headerHeight: CGFloat = 0
 
     private let parser = QuickAddParser()
     private let dateParser = NaturalLanguageDateParser()
@@ -21,54 +22,55 @@ struct NoteView: View {
     var body: some View {
         let note = store.note(id: noteID)
         let pinned = note?.isPinned ?? false
+        let title = note?.title ?? "Sticky"
 
         VStack(spacing: 0) {
-            header(note: note)
+            header(title: title, pinned: pinned)
             if !isCollapsed {
-                Divider()
                 blocks(note: note)
-                Divider()
-                quickAdd(note: note)
             }
         }
         .background(StickyBackground(color: note?.color ?? .yellow))
+        .foregroundStyle(Color.black)
         .background(
             WindowAccessor { window in
+                resolvedWindow = window
                 Task { @MainActor in
                     StickyWindowChrome.apply(to: window)
+                    windowInteractions.installTitlebarDoubleClick(on: window) {
+                        toggleCollapse()
+                    }
+                    applyWindowTitle(title)
                 }
-                resolvedWindow = window
                 applyPinIfNeeded(pinned: pinned)
             }
             .frame(width: 0, height: 0)
         )
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                quickAddFocused = true
-            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { entryFocused = true }
+        }
+        .onChange(of: title) { _, newValue in
+            applyWindowTitle(newValue)
         }
         .onChange(of: pinned) { _, newValue in
             applyPinIfNeeded(pinned: newValue)
         }
     }
 
-    private func header(note: Note?) -> some View {
-        HStack(spacing: 10) {
-            TextField("Title", text: Binding(
-                get: { note?.title ?? "" },
-                set: { store.renameNote(id: noteID, title: $0) }
-            ))
-                .textFieldStyle(.plain)
-                .font(.headline)
-
-            Spacer(minLength: 8)
+    private func header(title: String, pinned: Bool) -> some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.system(size: 18, weight: .bold))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
                 store.togglePinned(id: noteID)
             } label: {
-                Image(systemName: (note?.isPinned ?? false) ? "pin.fill" : "pin")
+                Image(systemName: pinned ? "pin.fill" : "pin")
+                    .foregroundStyle(.black)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .help("Pin (always on top)")
 
             Button(role: .destructive) {
@@ -76,8 +78,9 @@ struct NoteView: View {
                 dismiss()
             } label: {
                 Image(systemName: "trash")
+                    .foregroundStyle(.black)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .help("Delete sticky")
         }
         .background(
@@ -92,46 +95,35 @@ struct NoteView: View {
             }
         }
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            toggleCollapse()
-        }
-        .padding(12)
+        .onTapGesture(count: 2) { toggleCollapse() }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
     }
 
     private func blocks(note: Note?) -> some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 10) {
-                if (note?.blocks ?? []).isEmpty {
-                    ContentUnavailableView("Try /todo, /checklist, /remind, /color, /pin", systemImage: "slash.circle")
-                        .padding(.vertical, 20)
-                }
+            LazyVStack(alignment: .leading, spacing: 2) {
                 ForEach(note?.blocks ?? []) { block in
                     BlockRow(noteID: noteID, block: block)
                         .environmentObject(store)
                 }
+
+                NewEntryRow(
+                    text: $entryText,
+                    focus: $entryFocused,
+                    onCommit: submitEntry
+                )
             }
-            .padding(12)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 10)
         }
     }
 
-    private func quickAdd(note: Note?) -> some View {
-        HStack(spacing: 10) {
-            TextField("Quick add (e.g. 明早七点叫外卖, /checklist 牛奶,鸡蛋,面包, /remind 明早七点 叫外卖)", text: $quickAddText)
-                .textFieldStyle(.plain)
-                .focused($quickAddFocused)
-                .onSubmit(addFromQuickInput)
-
-            Button("Add") { addFromQuickInput() }
-                .keyboardShortcut(.return, modifiers: [])
-        }
-        .padding(12)
-    }
-
-    private func addFromQuickInput() {
-        let raw = quickAddText.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func submitEntry() {
+        let raw = entryText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { return }
 
-        defer { quickAddText = "" }
+        defer { entryText = "" }
 
         switch parser.parse(raw) {
         case .note(let text):
@@ -148,6 +140,8 @@ struct NoteView: View {
             store.setNoteColor(id: noteID, color: color)
         case .togglePin:
             store.togglePinned(id: noteID)
+        case .setTitle(let title):
+            store.renameNote(id: noteID, title: title)
         case .smart(let text):
             if let parsed = dateParser.extractDate(from: text) {
                 store.addBlock(to: noteID, block: .todo(parsed.remainder, dueAt: parsed.date))
@@ -155,12 +149,23 @@ struct NoteView: View {
                 store.addBlock(to: noteID, block: .note(text))
             }
         }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            entryFocused = true
+        }
     }
 
     private func applyPinIfNeeded(pinned: Bool) {
         guard let window = resolvedWindow as? NSWindow else { return }
         Task { @MainActor in
             window.level = pinned ? .floating : .normal
+        }
+    }
+
+    private func applyWindowTitle(_ title: String?) {
+        guard let window = resolvedWindow as? NSWindow else { return }
+        Task { @MainActor in
+            window.title = title ?? "Sticky"
         }
     }
 
@@ -175,17 +180,15 @@ struct NoteView: View {
             if let savedExpandedFrame {
                 window.setFrame(savedExpandedFrame, display: true, animate: true)
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                quickAddFocused = true
-            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { entryFocused = true }
         } else {
             savedExpandedFrame = window.frame
             isCollapsed = true
 
-            let minContentHeight = max(ceil(headerHeight + 8), 52)
             let currentFrame = window.frame
             let titleBarHeight = currentFrame.height - window.contentLayoutRect.height
-            let targetHeight = minContentHeight + titleBarHeight
+            let minHeader = max(ceil(headerHeight), 26)
+            let targetHeight = max(titleBarHeight + minHeader, 48)
 
             var newFrame = currentFrame
             newFrame.origin.y += (newFrame.height - targetHeight)
@@ -217,6 +220,8 @@ private struct StickyBackground: View {
             return [Color(red: 1.00, green: 0.84, blue: 0.91), Color(red: 0.98, green: 0.66, blue: 0.80)]
         case .green:
             return [Color(red: 0.82, green: 0.97, blue: 0.82), Color(red: 0.62, green: 0.89, blue: 0.62)]
+        case .red:
+            return [Color(red: 1.00, green: 0.78, blue: 0.74), Color(red: 0.98, green: 0.56, blue: 0.51)]
         }
     }
 }

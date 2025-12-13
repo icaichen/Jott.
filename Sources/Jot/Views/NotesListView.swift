@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct NotesListView: View {
     @EnvironmentObject private var store: JotStore
@@ -48,9 +47,6 @@ struct NotesListView: View {
                     }
                 }
             }
-        }
-        .onAppear {
-            NSApp.activate(ignoringOtherApps: true)
         }
     }
 }

@@ -8,12 +8,25 @@ struct QuickAddParser {
         case remind(text: String, dueText: String?)
         case setColor(NoteColor)
         case togglePin
+        case setTitle(String)
         case smart(text: String)
     }
 
     func parse(_ raw: String) -> Result {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasPrefix("/") else {
+            return .smart(text: trimmed)
+        }
+
+        if trimmed.lowercased().hasPrefix("/checklist") {
+            let remainder = String(trimmed.dropFirst("/checklist".count))
+            return .checklist(items: splitChecklistItems(remainder))
+        }
+
+        if trimmed.lowercased().hasPrefix("/title") {
+            let remainder = String(trimmed.dropFirst("/title".count))
+            let title = remainder.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !title.isEmpty { return .setTitle(title) }
             return .smart(text: trimmed)
         }
 
@@ -49,6 +62,12 @@ struct QuickAddParser {
             return .smart(text: trimmed)
 
         default:
+            if parts.count == 1, trimmed.count > 1 {
+                let title = String(trimmed.dropFirst())
+                if !title.isEmpty {
+                    return .setTitle(title)
+                }
+            }
             return .smart(text: trimmed)
         }
     }
@@ -56,9 +75,38 @@ struct QuickAddParser {
     private func splitChecklistItems(_ text: String) -> [String] {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return [] }
-        return trimmed
+
+        let normalized = trimmed
             .replacingOccurrences(of: "\t", with: " ")
-            .split(whereSeparator: { $0 == "," || $0 == ";" || $0 == "；" || $0 == "，" })
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+
+        let rawItems = normalized
+            .split(whereSeparator: { $0 == "\n" || $0 == "," || $0 == ";" || $0 == "；" || $0 == "，" })
             .map(String.init)
+
+        return rawItems
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map(stripChecklistPrefix)
+            .filter { !$0.isEmpty }
+    }
+
+    private func stripChecklistPrefix(_ s: String) -> String {
+        var out = s
+        let prefixes = ["- [ ]", "- []", "[ ]", "[]", "-", "*", "•"]
+        for p in prefixes {
+            if out.hasPrefix(p) {
+                out = out.dropPrefix(p).trimmingCharacters(in: .whitespacesAndNewlines)
+                break
+            }
+        }
+        return out
+    }
+}
+
+private extension String {
+    func dropPrefix(_ prefix: String) -> String {
+        guard hasPrefix(prefix) else { return self }
+        return String(dropFirst(prefix.count))
     }
 }

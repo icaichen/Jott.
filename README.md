@@ -20,5 +20,5 @@ swift run
 - `/todo <时间?> <内容>` 例如：`/todo 明早七点 叫外卖`
 - `/checklist <a,b,c>` 例如：`/checklist 牛奶, 鸡蛋, 面包`
 - `/remind <时间?> <内容>`：尽力写入 macOS Reminders（需要以 `.app` 方式运行才更稳定）
-- `/color yellow|blue|pink|green`：切换便签背景色
+- `/color yellow|blue|pink|green|red`：切换便签背景色
 - `/pin`：置顶（Always on top）

@@ -14,49 +14,86 @@ struct BlockRow: View {
         return f
     }()
 
+    private let leadingWidth: CGFloat = 22
+
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             switch block.kind {
             case .todo:
-                Toggle(isOn: Binding(
-                    get: { block.isDone ?? false },
-                    set: { newValue in
-                        var updated = block
-                        updated.isDone = newValue
-                        store.updateBlock(noteID: noteID, block: updated)
-                    }
-                )) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(block.text)
-                            .strikethrough(block.isDone ?? false)
-                            .foregroundStyle((block.isDone ?? false) ? .secondary : .primary)
+                Button {
+                    var updated = block
+                    updated.isDone = !(block.isDone ?? false)
+                    store.updateBlock(noteID: noteID, block: updated)
+                } label: {
+                    Image(systemName: (block.isDone ?? false) ? "checkmark.square.fill" : "square")
+                        .foregroundStyle(Color.black)
+                        .frame(width: leadingWidth, alignment: .leading)
+                        .accessibilityLabel((block.isDone ?? false) ? "Mark as not done" : "Mark as done")
+                }
+                .buttonStyle(.plain)
 
-                        if let dueAt = block.dueAt {
-                            Text(Self.dueFormatter.string(from: dueAt))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                VStack(alignment: .leading, spacing: 2) {
+                    TextField(
+                        "",
+                        text: Binding(
+                            get: { block.text },
+                            set: { newValue in
+                                var updated = block
+                                updated.text = newValue
+                                store.updateBlock(noteID: noteID, block: updated)
+                            }
+                        )
+                    )
+                    .textFieldStyle(.plain)
+                    .strikethrough(block.isDone ?? false)
+                    .foregroundStyle((block.isDone ?? false) ? Color.black.opacity(0.35) : Color.black)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .onSubmit { deleteIfEmpty() }
+                    .onExitCommand(perform: deleteIfEmpty)
+
+                    if let dueAt = block.dueAt {
+                        Text(Self.dueFormatter.string(from: dueAt))
+                            .font(.caption)
+                            .foregroundStyle(Color.black.opacity(0.45))
                     }
                 }
-                .toggleStyle(.checkbox)
 
             case .note:
-                Text(block.text)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+                Color.clear
+                    .frame(width: leadingWidth, height: 1)
 
-            Button {
-                store.deleteBlock(noteID: noteID, blockID: block.id)
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
+                TextField(
+                    "",
+                    text: Binding(
+                        get: { block.text },
+                        set: { newValue in
+                            var updated = block
+                            updated.text = newValue
+                            store.updateBlock(noteID: noteID, block: updated)
+                        }
+                    )
+                )
+                .textFieldStyle(.plain)
+                .foregroundStyle(Color.black)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .onSubmit { deleteIfEmpty() }
+                .onExitCommand(perform: deleteIfEmpty)
             }
-            .buttonStyle(.plain)
-            .help("Delete block")
         }
-        .padding(10)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .font(.system(size: 20))
+        .padding(.vertical, 2)
+        .contextMenu {
+            Button("Delete") {
+                store.deleteBlock(noteID: noteID, blockID: block.id)
+            }
+        }
+    }
+
+    private func deleteIfEmpty() {
+        let trimmed = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            store.deleteBlock(noteID: noteID, blockID: block.id)
+            return
+        }
     }
 }
-

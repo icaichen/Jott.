@@ -5,6 +5,7 @@ enum NoteColor: String, Codable, CaseIterable, Hashable {
     case blue
     case pink
     case green
+    case red
 }
 
 struct Note: Identifiable, Codable, Hashable {
