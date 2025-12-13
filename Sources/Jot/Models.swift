@@ -1,11 +1,20 @@
 import Foundation
 
+enum NoteColor: String, Codable, CaseIterable, Hashable {
+    case yellow
+    case blue
+    case pink
+    case green
+}
+
 struct Note: Identifiable, Codable, Hashable {
     var id: UUID = UUID()
     var title: String = "Sticky"
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     var blocks: [Block] = []
+    var color: NoteColor = .yellow
+    var isPinned: Bool = false
 }
 
 struct Block: Identifiable, Codable, Hashable {
@@ -20,6 +29,7 @@ struct Block: Identifiable, Codable, Hashable {
     var text: String
     var isDone: Bool? = nil
     var dueAt: Date? = nil
+    var reminderID: String? = nil
 
     static func note(_ text: String) -> Block {
         Block(kind: .note, text: text, isDone: nil, dueAt: nil)
@@ -27,6 +37,10 @@ struct Block: Identifiable, Codable, Hashable {
 
     static func todo(_ text: String, dueAt: Date?) -> Block {
         Block(kind: .todo, text: text, isDone: false, dueAt: dueAt)
+    }
+
+    static func reminderTodo(_ text: String, dueAt: Date?) -> Block {
+        Block(kind: .todo, text: text, isDone: false, dueAt: dueAt, reminderID: nil)
     }
 }
 
@@ -36,4 +50,3 @@ extension Array where Element == Block {
         self[idx] = newValue
     }
 }
-

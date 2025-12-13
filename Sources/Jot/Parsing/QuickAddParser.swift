@@ -4,6 +4,10 @@ struct QuickAddParser {
     enum Result: Equatable {
         case note(text: String)
         case todo(text: String, dueText: String?)
+        case checklist(items: [String])
+        case remind(text: String, dueText: String?)
+        case setColor(NoteColor)
+        case togglePin
         case smart(text: String)
     }
 
@@ -24,13 +28,37 @@ struct QuickAddParser {
             if parts.count == 2 { return .todo(text: String(parts[1]), dueText: nil) }
             return .todo(text: String(parts[2]), dueText: String(parts[1]))
 
-        case "/note", "/notes":
-            if parts.count == 1 { return .note(text: "") }
-            return .note(text: parts.dropFirst().joined(separator: " "))
+        case "/checklist":
+            let rest = parts.dropFirst().joined(separator: " ")
+            let items = splitChecklistItems(rest)
+            return .checklist(items: items)
+
+        case "/remind":
+            if parts.count == 1 { return .remind(text: "Reminder", dueText: nil) }
+            if parts.count == 2 { return .remind(text: String(parts[1]), dueText: nil) }
+            return .remind(text: String(parts[2]), dueText: String(parts[1]))
+
+        case "/pin":
+            return .togglePin
+
+        case "/color":
+            let arg = (parts.count >= 2) ? String(parts[1]).lowercased() : ""
+            if let color = NoteColor(rawValue: arg) {
+                return .setColor(color)
+            }
+            return .smart(text: trimmed)
 
         default:
             return .smart(text: trimmed)
         }
     }
-}
 
+    private func splitChecklistItems(_ text: String) -> [String] {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return [] }
+        return trimmed
+            .replacingOccurrences(of: "\t", with: " ")
+            .split(whereSeparator: { $0 == "," || $0 == ";" || $0 == "；" || $0 == "，" })
+            .map(String.init)
+    }
+}

@@ -8,6 +8,7 @@ final class JotStore: ObservableObject {
     private var saveTask: Task<Void, Never>?
     private let persistence = Persistence()
     private let notifications = NotificationScheduler.shared
+    private let reminders = RemindersBridge.shared
 
     init() {
         notes = (try? persistence.load()) ?? [Note(title: "Sticky", blocks: [])]
@@ -39,6 +40,20 @@ final class JotStore: ObservableObject {
         scheduleSave()
     }
 
+    func setNoteColor(id: Note.ID, color: NoteColor) {
+        guard let idx = notes.firstIndex(where: { $0.id == id }) else { return }
+        notes[idx].color = color
+        notes[idx].updatedAt = Date()
+        scheduleSave()
+    }
+
+    func togglePinned(id: Note.ID) {
+        guard let idx = notes.firstIndex(where: { $0.id == id }) else { return }
+        notes[idx].isPinned.toggle()
+        notes[idx].updatedAt = Date()
+        scheduleSave()
+    }
+
     func addBlock(to noteID: Note.ID, block: Block) {
         guard let idx = notes.firstIndex(where: { $0.id == noteID }) else { return }
         notes[idx].blocks.append(block)
@@ -48,6 +63,31 @@ final class JotStore: ObservableObject {
         scheduleNotificationsIfNeeded(note: notes[idx], block: block)
     }
 
+    func addChecklist(to noteID: Note.ID, items: [String]) {
+        for item in items {
+            let trimmed = item.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty { continue }
+            addBlock(to: noteID, block: .todo(trimmed, dueAt: nil))
+        }
+    }
+
+    func addReminderTodo(to noteID: Note.ID, text: String, dueAt: Date?) {
+        var block = Block.reminderTodo(text, dueAt: dueAt)
+        addBlock(to: noteID, block: block)
+
+        Task { [weak self] in
+            guard let self else { return }
+            guard let dueAt else { return }
+            let noteTitle = self.note(id: noteID)?.title ?? "Jot"
+            if let reminderID = await self.reminders.createReminder(title: text, notes: noteTitle, dueAt: dueAt) {
+                block.reminderID = reminderID
+                await MainActor.run {
+                    self.updateBlock(noteID: noteID, block: block)
+                }
+            }
+        }
+    }
+
     func updateBlock(noteID: Note.ID, block: Block) {
         guard let idx = notes.firstIndex(where: { $0.id == noteID }) else { return }
         notes[idx].blocks.replace(id: block.id, with: block)
@@ -55,15 +95,23 @@ final class JotStore: ObservableObject {
         scheduleSave()
 
         scheduleNotificationsIfNeeded(note: notes[idx], block: block)
+
+        if block.kind == .todo, (block.isDone ?? false), let reminderID = block.reminderID {
+            Task { await reminders.completeReminder(id: reminderID) }
+        }
     }
 
     func deleteBlock(noteID: Note.ID, blockID: Block.ID) {
         guard let idx = notes.firstIndex(where: { $0.id == noteID }) else { return }
+        let reminderID = notes[idx].blocks.first(where: { $0.id == blockID })?.reminderID
         notes[idx].blocks.removeAll { $0.id == blockID }
         notes[idx].updatedAt = Date()
         scheduleSave()
 
         Task { await notifications.cancelTodo(id: blockID) }
+        if let reminderID {
+            Task { await reminders.deleteReminder(id: reminderID) }
+        }
     }
 
     func scheduleSave() {

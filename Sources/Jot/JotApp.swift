@@ -22,7 +22,7 @@ struct JotApp: App {
 
         WindowGroup(for: Note.ID.self) { noteID in
             if let id = noteID.wrappedValue, let note = store.note(id: id) {
-                NoteView(note: note)
+                NoteView(noteID: note.id)
                     .environmentObject(store)
             } else {
                 ContentUnavailableView("Note not found", systemImage: "note.text")
