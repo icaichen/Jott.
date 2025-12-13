@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Jot}",
+            "name": "Debug Jot",
+            "target": "Jot",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug Jot"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Jot}",
+            "name": "Release Jot",
+            "target": "Jot",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release Jot"
+        }
+    ]
+}
