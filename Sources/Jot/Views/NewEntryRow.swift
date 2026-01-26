@@ -4,13 +4,14 @@ struct NewEntryRow: View {
     @Binding var text: String
     var focus: FocusState<Bool>.Binding
     var onCommit: () -> Void
+    var useCheckboxSpacing: Bool = false
 
     private let leadingWidth: CGFloat = 22
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Color.clear
-                .frame(width: leadingWidth, height: 1)
+                .frame(width: useCheckboxSpacing ? leadingWidth : 0, height: 1)
 
             TextField("", text: $text)
                 .textFieldStyle(.plain)

@@ -111,12 +111,29 @@ struct NoteView: View {
                 NewEntryRow(
                     text: $entryText,
                     focus: $entryFocused,
-                    onCommit: submitEntry
+                    onCommit: submitEntry,
+                    useCheckboxSpacing: shouldUseCheckboxSpacing(for: entryText)
                 )
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
         }
+    }
+
+    private func shouldUseCheckboxSpacing(for text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+
+        return trimmed.hasPrefix("/todo") ||
+               trimmed.hasPrefix("/checklist") ||
+               trimmed.hasPrefix("/remind") ||
+               trimmed.hasPrefix("- [") ||
+               trimmed.hasPrefix("-[]") ||
+               trimmed.hasPrefix("[ ]") ||
+               trimmed.hasPrefix("[]") ||
+               trimmed.hasPrefix("- ") ||
+               trimmed.hasPrefix("* ") ||
+               trimmed.hasPrefix("• ")
     }
 
     private func submitEntry() {
