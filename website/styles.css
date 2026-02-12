@@ -82,19 +82,19 @@ main {
 .brand {
   display: inline-flex;
   align-items: center;
+  gap: 0.55rem;
   font-family: "Space Grotesk", "Manrope", sans-serif;
   font-size: 1.2rem;
   letter-spacing: 0.02em;
   font-weight: 700;
 }
 
-.brand-dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 999px;
-  margin-right: 0.55rem;
-  background: linear-gradient(120deg, var(--accent-strong), var(--accent-2));
-  box-shadow: 0 0 0 4px rgba(239, 201, 76, 0.3);
+.brand-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 7px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16);
 }
 
 .nav {
