@@ -3,7 +3,9 @@ import SwiftUI
 
 struct NoteView: View {
     @EnvironmentObject private var store: JotStore
+    @EnvironmentObject private var purchases: PurchaseStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openWindow) private var openWindow
 
     let noteID: Note.ID
 
@@ -24,7 +26,7 @@ struct NoteView: View {
     var body: some View {
         let note = store.note(id: noteID)
         let pinned = note?.isPinned ?? false
-        let title = note?.title ?? "Sticky"
+        let title = note?.title ?? Note.defaultTitle
 
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 0) {
@@ -60,6 +62,7 @@ struct NoteView: View {
                 }
                 applyPinIfNeeded(pinned: pinned)
             }
+            .frame(width: 0, height: 0)
         )
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { focusedField = .newEntry }
@@ -84,6 +87,11 @@ struct NoteView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
+                guard purchases.hasPremiumAccess else {
+                    purchases.statusMessage = "7-day trial ended. Upgrade to keep using pin and color commands."
+                    openWindow(value: PaywallWindow.show)
+                    return
+                }
                 store.togglePinned(id: noteID)
             } label: {
                 Image(systemName: pinned ? "pin.fill" : "pin")
@@ -185,8 +193,18 @@ struct NoteView: View {
         case .checklist(let items):
             store.addChecklist(to: noteID, items: items)
         case .setColor(let color):
+            guard purchases.hasPremiumAccess else {
+                purchases.statusMessage = "7-day trial ended. Upgrade to keep using pin and color commands."
+                openWindow(value: PaywallWindow.show)
+                return
+            }
             store.setNoteColor(id: noteID, color: color)
         case .togglePin:
+            guard purchases.hasPremiumAccess else {
+                purchases.statusMessage = "7-day trial ended. Upgrade to keep using pin and color commands."
+                openWindow(value: PaywallWindow.show)
+                return
+            }
             store.togglePinned(id: noteID)
         case .setTitle(let title):
             store.renameNote(id: noteID, title: title)
@@ -244,7 +262,7 @@ struct NoteView: View {
     private func applyWindowTitle(_ title: String?) {
         guard let window = resolvedWindow else { return }
         Task { @MainActor in
-            window.title = title ?? "Sticky"
+            window.title = title ?? Note.defaultTitle
         }
     }
 

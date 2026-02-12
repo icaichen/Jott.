@@ -78,7 +78,7 @@ final class StickyWindowCloseDelegate: NSObject, NSWindowDelegate {
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         guard let store = store else { return true }
         guard let note = store.note(id: noteID) else { return true }
-        let hasContent = !note.blocks.isEmpty || note.title != "Sticky"
+        let hasContent = !note.blocks.isEmpty || note.title != Note.defaultTitle
 
         if !hasContent {
             store.deleteNotes(ids: [noteID])
@@ -97,6 +97,7 @@ final class StickyWindowCloseDelegate: NSObject, NSWindowDelegate {
         let response = alert.runModal()
         switch response {
         case .alertFirstButtonReturn: // Save
+            store.setNoteInList(id: noteID, inList: true)
             return true
         case .alertSecondButtonReturn: // Delete
             store.deleteNotes(ids: [noteID])

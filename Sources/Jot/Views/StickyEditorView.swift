@@ -17,7 +17,7 @@ struct StickyEditorView: View {
     var body: some View {
         let note = store.note(id: noteID)
         let pinned = note?.isPinned ?? false
-        let title = note?.title ?? "Sticky"
+        let title = note?.title ?? Note.defaultTitle
 
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 0) {
@@ -128,7 +128,7 @@ struct StickyEditorView: View {
     private func applyWindowTitle(_ title: String?) {
         guard let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == "sticky-\(noteID)" }) else { return }
         Task { @MainActor in
-            window.title = title ?? "Sticky"
+            window.title = title ?? Note.defaultTitle
         }
     }
 

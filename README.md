@@ -1,4 +1,4 @@
-# Jot
+# Jott - Sticky Notes
 
 Mac 上的 sticky notes MVP（SwiftUI），目标是像 Stickies 一样轻量，同时支持：
 

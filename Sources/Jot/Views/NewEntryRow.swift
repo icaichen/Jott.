@@ -15,7 +15,7 @@ struct NewEntryRow: View {
             Color.clear
                 .frame(width: useCheckboxSpacing ? leadingWidth : 0, height: 1)
 
-            TextField("", text: $text, axis: .vertical)
+            TextField("Type note, or use /todo /checklist /title /pin /color", text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: store.contentFontSize))
                 .foregroundStyle(Color.black)
