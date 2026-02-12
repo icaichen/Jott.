@@ -6,6 +6,10 @@ struct BlockRow: View {
     let noteID: Note.ID
     let block: Block
 
+    var focusedField: FocusState<FocusField?>.Binding
+    var onMoveUp: () -> Void
+    var onMoveDown: () -> Void
+
     private static let dueFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_CN")
@@ -42,13 +46,29 @@ struct BlockRow: View {
                                 updated.text = newValue
                                 store.updateBlock(noteID: noteID, block: updated)
                             }
-                        )
+                        ),
+                        axis: .vertical
                     )
                     .textFieldStyle(.plain)
-                    .strikethrough(block.isDone ?? false)
+                    .focused(focusedField, equals: .block(block.id))
                     .foregroundStyle((block.isDone ?? false) ? Color.black.opacity(0.35) : Color.black)
+                    .overlay(alignment: .leading) {
+                        if block.isDone ?? false {
+                            Rectangle()
+                                .frame(height: 1.5)
+                                .foregroundStyle(Color.black.opacity(0.35))
+                                .padding(.top, 2) // Roughly center it on the text line
+                                .transition(.asymmetric(insertion: .move(edge: .leading), removal: .opacity))
+                        }
+                    }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .onSubmit { deleteIfEmpty() }
+                    .onKeyPress(.return) {
+                        if block.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            deleteIfEmpty()
+                            return .handled
+                        }
+                        return .ignored
+                    }
                     .onExitCommand(perform: deleteIfEmpty)
 
                     if let dueAt = block.dueAt {
@@ -71,16 +91,32 @@ struct BlockRow: View {
                             updated.text = newValue
                             store.updateBlock(noteID: noteID, block: updated)
                         }
-                    )
+                    ),
+                    axis: .vertical
                 )
                 .textFieldStyle(.plain)
+                .focused(focusedField, equals: .block(block.id))
                 .foregroundStyle(Color.black)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .onSubmit { deleteIfEmpty() }
+                .onKeyPress(.return) {
+                    if block.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        deleteIfEmpty()
+                        return .handled
+                    }
+                    return .ignored
+                }
                 .onExitCommand(perform: deleteIfEmpty)
             }
         }
-        .font(.system(size: 20))
+        .onKeyPress(.upArrow) {
+            onMoveUp()
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            onMoveDown()
+            return .handled
+        }
+        .font(.system(size: store.contentFontSize))
         .padding(.vertical, 2)
         .contextMenu {
             Button("Delete") {

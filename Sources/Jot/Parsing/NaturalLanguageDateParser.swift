@@ -17,20 +17,22 @@ struct NaturalLanguageDateParser {
         guard !original.isEmpty else { return nil }
 
         if let detectorDate = detectDate(original) {
-            return Extraction(date: detectorDate.date, remainder: original.replacingOccurrences(of: detectorDate.matchedText, with: "").trimmedSpaces())
+            var remainder = original
+            remainder.removeSubrange(detectorDate.range)
+            return Extraction(date: detectorDate.date, remainder: remainder.trimmedSpaces())
         }
 
         return parseChineseRelative(original)
     }
 
-    private func detectDate(_ text: String) -> (date: Date, matchedText: String)? {
+    private func detectDate(_ text: String) -> (date: Date, range: Range<String.Index>)? {
         guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue) else { return nil }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
         guard let match = detector.firstMatch(in: text, options: [], range: range),
               let date = match.date,
               let r = Range(match.range, in: text)
         else { return nil }
-        return (date, String(text[r]))
+        return (date, r)
     }
 
     private func parseChineseRelative(_ text: String) -> Extraction? {

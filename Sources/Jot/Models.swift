@@ -1,5 +1,10 @@
 import Foundation
 
+enum FocusField: Hashable {
+    case block(UUID)
+    case newEntry
+}
+
 enum NoteColor: String, Codable, CaseIterable, Hashable {
     case yellow
     case blue

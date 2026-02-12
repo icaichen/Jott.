@@ -3,9 +3,8 @@ import Foundation
 struct QuickAddParser {
     enum Result: Equatable {
         case note(text: String)
-        case todo(text: String, dueText: String?)
+        case todo(rawText: String)
         case checklist(items: [String])
-        case remind(text: String, dueText: String?)
         case setColor(NoteColor)
         case togglePin
         case setTitle(String)
@@ -37,19 +36,13 @@ struct QuickAddParser {
 
         switch command {
         case "/todo":
-            if parts.count == 1 { return .todo(text: "Todo", dueText: nil) }
-            if parts.count == 2 { return .todo(text: String(parts[1]), dueText: nil) }
-            return .todo(text: String(parts[2]), dueText: String(parts[1]))
+            let remainder = parts.dropFirst().joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            return .todo(rawText: remainder.isEmpty ? "Todo" : remainder)
 
         case "/checklist":
             let rest = parts.dropFirst().joined(separator: " ")
             let items = splitChecklistItems(rest)
             return .checklist(items: items)
-
-        case "/remind":
-            if parts.count == 1 { return .remind(text: "Reminder", dueText: nil) }
-            if parts.count == 2 { return .remind(text: String(parts[1]), dueText: nil) }
-            return .remind(text: String(parts[2]), dueText: String(parts[1]))
 
         case "/pin":
             return .togglePin

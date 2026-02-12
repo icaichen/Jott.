@@ -38,6 +38,10 @@ struct NotesListView: View {
             }
             .navigationTitle("Jot")
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Jot")
+                        .font(.headline)
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         let id = store.createNote()

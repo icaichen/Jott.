@@ -8,11 +8,13 @@ struct NoteView: View {
     let noteID: Note.ID
 
     @State private var entryText: String = ""
-    @FocusState private var entryFocused: Bool
+    @FocusState private var focusedField: FocusField?
 
     @State private var isCollapsed: Bool = false
     @State private var savedExpandedFrame: CGRect?
-    @State private var resolvedWindow: AnyObject?
+    @State private var resolvedWindow: NSWindow?
+    @State private var hasAppliedWindowChrome = false
+    @State private var closeDelegate: StickyWindowCloseDelegate?
     @State private var windowInteractions = WindowInteractionsInstaller()
     @State private var headerHeight: CGFloat = 0
 
@@ -24,36 +26,53 @@ struct NoteView: View {
         let pinned = note?.isPinned ?? false
         let title = note?.title ?? "Sticky"
 
-        VStack(spacing: 0) {
-            header(title: title, pinned: pinned)
-            if !isCollapsed {
-                blocks(note: note)
+        GeometryReader { geometry in
+            VStack(alignment: .leading, spacing: 0) {
+                header(title: title, pinned: pinned)
+                    .contentShape(Rectangle())
+                    .highPriorityGesture(
+                        TapGesture(count: 2)
+                            .onEnded {
+                                toggleCollapse()
+                            }
+                    )
+                
+                if !isCollapsed {
+                    blocks(note: note)
+                }
             }
+            .padding(.top, -geometry.safeAreaInsets.top)
         }
         .background(StickyBackground(color: note?.color ?? .yellow))
         .foregroundStyle(Color.black)
+        .ignoresSafeArea(.container, edges: .top)
         .background(
             WindowAccessor { window in
                 resolvedWindow = window
                 Task { @MainActor in
-                    StickyWindowChrome.apply(to: window)
-                    windowInteractions.installTitlebarDoubleClick(on: window) {
-                        toggleCollapse()
+                    if !hasAppliedWindowChrome {
+                        StickyWindowChrome.apply(to: window)
+                        closeDelegate = StickyWindowCloseDelegate(store: store, noteID: noteID)
+                        window.delegate = closeDelegate
+                        hasAppliedWindowChrome = true
                     }
                     applyWindowTitle(title)
                 }
                 applyPinIfNeeded(pinned: pinned)
             }
-            .frame(width: 0, height: 0)
         )
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { entryFocused = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { focusedField = .newEntry }
         }
         .onChange(of: title) { _, newValue in
             applyWindowTitle(newValue)
         }
         .onChange(of: pinned) { _, newValue in
             applyPinIfNeeded(pinned: newValue)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: StickyNotifications.titleBarDoubleClick)) { note in
+            guard note.object as? NSWindow === resolvedWindow else { return }
+            toggleCollapse()
         }
     }
 
@@ -83,6 +102,10 @@ struct NoteView: View {
             .buttonStyle(.plain)
             .help("Delete sticky")
         }
+        .padding(.leading, 12)
+        .padding(.trailing, 10)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
         .background(
             GeometryReader { proxy in
                 Color.clear
@@ -94,28 +117,36 @@ struct NoteView: View {
                 headerHeight = newValue
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) { toggleCollapse() }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.black.opacity(0.12))
+                .frame(height: 1)
+        }
     }
 
     private func blocks(note: Note?) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 2) {
                 ForEach(note?.blocks ?? []) { block in
-                    BlockRow(noteID: noteID, block: block)
-                        .environmentObject(store)
+                    BlockRow(
+                        noteID: noteID,
+                        block: block,
+                        focusedField: $focusedField,
+                        onMoveUp: { moveFocusFrom(blockID: block.id, direction: .up) },
+                        onMoveDown: { moveFocusFrom(blockID: block.id, direction: .down) }
+                    )
+                    .environmentObject(store)
                 }
 
                 NewEntryRow(
                     text: $entryText,
-                    focus: $entryFocused,
+                    focusedField: $focusedField,
                     onCommit: submitEntry,
-                    useCheckboxSpacing: shouldUseCheckboxSpacing(for: entryText)
+                    useCheckboxSpacing: shouldUseCheckboxSpacing(for: entryText),
+                    onMoveUp: { moveFocusFromNewEntry(direction: .up) }
                 )
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 12) // Sync with header padding
             .padding(.vertical, 10)
         }
     }
@@ -126,7 +157,6 @@ struct NoteView: View {
 
         return trimmed.hasPrefix("/todo") ||
                trimmed.hasPrefix("/checklist") ||
-               trimmed.hasPrefix("/remind") ||
                trimmed.hasPrefix("- [") ||
                trimmed.hasPrefix("-[]") ||
                trimmed.hasPrefix("[ ]") ||
@@ -145,14 +175,15 @@ struct NoteView: View {
         switch parser.parse(raw) {
         case .note(let text):
             store.addBlock(to: noteID, block: .note(text))
-        case .todo(let text, let dueText):
-            let dueAt = dueText.flatMap { dateParser.parse(from: $0)?.date }
-            store.addBlock(to: noteID, block: .todo(text, dueAt: dueAt))
+        case .todo(let rawText):
+            if let parsed = dateParser.extractDate(from: rawText) {
+                let content = parsed.remainder.isEmpty ? "Todo" : parsed.remainder
+                store.addBlock(to: noteID, block: .todo(content, dueAt: parsed.date))
+            } else {
+                store.addBlock(to: noteID, block: .todo(rawText, dueAt: nil))
+            }
         case .checklist(let items):
             store.addChecklist(to: noteID, items: items)
-        case .remind(let text, let dueText):
-            let dueAt = dueText.flatMap { dateParser.parse(from: $0)?.date }
-            store.addReminderTodo(to: noteID, text: text, dueAt: dueAt)
         case .setColor(let color):
             store.setNoteColor(id: noteID, color: color)
         case .togglePin:
@@ -168,45 +199,75 @@ struct NoteView: View {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            entryFocused = true
+            focusedField = .newEntry
+        }
+    }
+
+    private enum NavigationDirection {
+        case up, down
+    }
+
+    private func moveFocusFrom(blockID: UUID, direction: NavigationDirection) {
+        let blocks = store.note(id: noteID)?.blocks ?? []
+        guard let currentIndex = blocks.firstIndex(where: { $0.id == blockID }) else { return }
+
+        switch direction {
+        case .up:
+            if currentIndex > 0 {
+                focusedField = .block(blocks[currentIndex - 1].id)
+            }
+        case .down:
+            if currentIndex < blocks.count - 1 {
+                focusedField = .block(blocks[currentIndex + 1].id)
+            } else {
+                focusedField = .newEntry
+            }
+        }
+    }
+
+    private func moveFocusFromNewEntry(direction: NavigationDirection) {
+        if direction == .up {
+            let blocks = store.note(id: noteID)?.blocks ?? []
+            if let lastBlock = blocks.last {
+                focusedField = .block(lastBlock.id)
+            }
         }
     }
 
     private func applyPinIfNeeded(pinned: Bool) {
-        guard let window = resolvedWindow as? NSWindow else { return }
+        guard let window = resolvedWindow else { return }
         Task { @MainActor in
             window.level = pinned ? .floating : .normal
         }
     }
 
     private func applyWindowTitle(_ title: String?) {
-        guard let window = resolvedWindow as? NSWindow else { return }
+        guard let window = resolvedWindow else { return }
         Task { @MainActor in
             window.title = title ?? "Sticky"
         }
     }
 
     private func toggleCollapse() {
-        guard let window = resolvedWindow as? NSWindow else {
+        guard let window = resolvedWindow else {
             isCollapsed.toggle()
             return
         }
-
+    
         if isCollapsed {
             isCollapsed = false
             if let savedExpandedFrame {
                 window.setFrame(savedExpandedFrame, display: true, animate: true)
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { entryFocused = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { focusedField = .newEntry }
         } else {
             savedExpandedFrame = window.frame
             isCollapsed = true
-
+    
             let currentFrame = window.frame
-            let titleBarHeight = currentFrame.height - window.contentLayoutRect.height
-            let minHeader = max(ceil(headerHeight), 26)
-            let targetHeight = max(titleBarHeight + minHeader, 48)
-
+            // With fullSizeContentView, the collapsed height is simply the header height
+            let targetHeight = max(ceil(headerHeight), 32)
+    
             var newFrame = currentFrame
             newFrame.origin.y += (newFrame.height - targetHeight)
             newFrame.size.height = targetHeight

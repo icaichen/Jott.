@@ -1,18 +1,40 @@
 import Combine
 import Foundation
 
+private let contentFontSizeKey = "jot.contentFontSize"
+private let defaultContentFontSize: CGFloat = 20
+private let minContentFontSize: CGFloat = 12
+private let maxContentFontSize: CGFloat = 32
+
 @MainActor
 final class JotStore: ObservableObject {
     @Published private(set) var notes: [Note] = []
+    @Published var contentFontSize: CGFloat = defaultContentFontSize {
+        didSet {
+            let clamped = min(max(contentFontSize, minContentFontSize), maxContentFontSize)
+            if clamped != contentFontSize { contentFontSize = clamped; return }
+            UserDefaults.standard.set(Double(contentFontSize), forKey: contentFontSizeKey)
+        }
+    }
 
     private var saveTask: Task<Void, Never>?
     private let persistence = Persistence()
     private let notifications = NotificationScheduler.shared
-    private let reminders = RemindersBridge.shared
 
     init() {
         notes = (try? persistence.load()) ?? [Note(title: "Sticky", blocks: [])]
         normalize()
+        if let s = UserDefaults.standard.object(forKey: contentFontSizeKey) as? Double {
+            contentFontSize = min(max(CGFloat(s), minContentFontSize), maxContentFontSize)
+        }
+    }
+
+    func increaseContentFontSize() {
+        contentFontSize = min(contentFontSize + 2, maxContentFontSize)
+    }
+
+    func decreaseContentFontSize() {
+        contentFontSize = max(contentFontSize - 2, minContentFontSize)
     }
 
     func note(id: Note.ID) -> Note? {
@@ -71,23 +93,6 @@ final class JotStore: ObservableObject {
         }
     }
 
-    func addReminderTodo(to noteID: Note.ID, text: String, dueAt: Date?) {
-        var block = Block.reminderTodo(text, dueAt: dueAt)
-        addBlock(to: noteID, block: block)
-
-        Task { [weak self] in
-            guard let self else { return }
-            guard let dueAt else { return }
-            let noteTitle = self.note(id: noteID)?.title ?? "Jot"
-            if let reminderID = await self.reminders.createReminder(title: text, notes: noteTitle, dueAt: dueAt) {
-                block.reminderID = reminderID
-                await MainActor.run {
-                    self.updateBlock(noteID: noteID, block: block)
-                }
-            }
-        }
-    }
-
     func updateBlock(noteID: Note.ID, block: Block) {
         guard let idx = notes.firstIndex(where: { $0.id == noteID }) else { return }
         notes[idx].blocks.replace(id: block.id, with: block)
@@ -95,23 +100,21 @@ final class JotStore: ObservableObject {
         scheduleSave()
 
         scheduleNotificationsIfNeeded(note: notes[idx], block: block)
-
-        if block.kind == .todo, (block.isDone ?? false), let reminderID = block.reminderID {
-            Task { await reminders.completeReminder(id: reminderID) }
-        }
     }
 
     func deleteBlock(noteID: Note.ID, blockID: Block.ID) {
         guard let idx = notes.firstIndex(where: { $0.id == noteID }) else { return }
-        let reminderID = notes[idx].blocks.first(where: { $0.id == blockID })?.reminderID
         notes[idx].blocks.removeAll { $0.id == blockID }
         notes[idx].updatedAt = Date()
         scheduleSave()
 
         Task { await notifications.cancelTodo(id: blockID) }
-        if let reminderID {
-            Task { await reminders.deleteReminder(id: reminderID) }
-        }
+    }
+
+    func saveNow() {
+        saveTask?.cancel()
+        let snapshot = notes
+        try? (persistence as Persistence).save(snapshot)
     }
 
     func scheduleSave() {

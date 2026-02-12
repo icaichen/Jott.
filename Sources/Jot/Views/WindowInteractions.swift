@@ -39,6 +39,7 @@ final class WindowInteractionsInstaller {
         if let titlebar = window.standardWindowButton(.closeButton)?.superview {
             return titlebar
         }
+        // Fallback to the root container view if titlebar is not found
         return window.contentView?.superview ?? window.contentView ?? NSView()
     }
 }
