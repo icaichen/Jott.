@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jott - Sticky Notes for Fast Thinkers</title>
+    <meta
+      name="description"
+      content="Jott helps you capture thoughts instantly on macOS with clean sticky notes, slash commands, and one-time lifetime unlock."
+    />
+    <meta property="og:title" content="Jott - Sticky Notes for Fast Thinkers" />
+    <meta
+      property="og:description"
+      content="Capture thoughts instantly with slash commands, quick sticky notes, and a distraction-free desktop workflow."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://jott.app" />
+    <meta name="theme-color" content="#f5df77" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg-orb bg-orb-a" aria-hidden="true"></div>
+    <div class="bg-orb bg-orb-b" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="./index.html" aria-label="Jott Home">
+        <span class="brand-dot"></span>
+        <span>Jott</span>
+      </a>
+      <nav class="nav">
+        <a href="#features">Features</a>
+        <a href="#slash">Slash Commands</a>
+        <a href="#pricing">Pricing</a>
+        <a href="./support.html">Support</a>
+      </nav>
+      <a class="btn btn-small" href="#download">Get Jott</a>
+    </header>
+
+    <main>
+      <section class="hero reveal">
+        <p class="eyebrow">Sticky notes for fast thinkers</p>
+        <h1>Capture thoughts instantly.<br />Organize with <code>/</code> in seconds.</h1>
+        <p class="hero-copy">
+          Jott is a focused macOS sticky notes app. Open, type, and move on. Use slash
+          commands to create todos, checklists, titles, reminders, and colors without breaking flow.
+        </p>
+        <div class="hero-actions" id="download">
+          <a class="btn" href="#" aria-label="Download on Mac App Store">Download on the Mac App Store</a>
+          <a class="btn btn-ghost" href="#pricing">See pricing</a>
+        </div>
+        <p class="micro">macOS 14+ • Local-first feel • One-time lifetime unlock</p>
+      </section>
+
+      <section class="grid-three reveal" id="features">
+        <article class="feature-card">
+          <h3>Zero-friction capture</h3>
+          <p>Launch and jot immediately. Keep notes visible on desktop while you work.</p>
+        </article>
+        <article class="feature-card">
+          <h3>Slash-powered structure</h3>
+          <p>Turn plain text into useful blocks fast: todo, checklist, title, color, pin.</p>
+        </article>
+        <article class="feature-card">
+          <h3>Calm visual focus</h3>
+          <p>A clean sticky canvas designed to stay out of your way and keep you in flow.</p>
+        </article>
+      </section>
+
+      <section class="slash reveal" id="slash">
+        <div>
+          <p class="eyebrow">How slash commands work</p>
+          <h2>Type <code>/</code> to turn notes into action</h2>
+          <p>
+            Jott supports quick commands inspired by modern knowledge tools, tuned for sticky-note speed.
+          </p>
+        </div>
+        <div class="command-list" role="list" aria-label="Slash commands examples">
+          <p role="listitem"><code>/todo Buy milk</code><span>Create a task row instantly</span></p>
+          <p role="listitem"><code>/checklist milk, eggs, bread</code><span>Generate a full checklist</span></p>
+          <p role="listitem"><code>/title Weekly Plan</code><span>Set a clean note title</span></p>
+          <p role="listitem"><code>/color yellow</code><span>Switch sticky color theme</span></p>
+          <p role="listitem"><code>/pin</code><span>Keep note always on top</span></p>
+        </div>
+      </section>
+
+      <section class="pricing reveal" id="pricing">
+        <p class="eyebrow">Simple pricing</p>
+        <h2>Jott Pro • Lifetime unlock</h2>
+        <div class="price-box">
+          <p class="price">$0.99 <span>one-time</span></p>
+          <ul>
+            <li>Unlock premium features forever</li>
+            <li>No recurring subscription</li>
+            <li>Restore purchases anytime</li>
+          </ul>
+          <a class="btn" href="#download">Unlock in app</a>
+        </div>
+      </section>
+
+      <section class="faq reveal">
+        <p class="eyebrow">FAQ</p>
+        <h2>Common questions</h2>
+        <details>
+          <summary>Is Jott a subscription?</summary>
+          <p>No. Jott Pro is a one-time lifetime purchase.</p>
+        </details>
+        <details>
+          <summary>Can I restore purchases?</summary>
+          <p>Yes. Use the in-app “Restore Purchases” action to sync your entitlement.</p>
+        </details>
+        <details>
+          <summary>Where can I learn slash commands?</summary>
+          <p>Inside the app: Help → Slash Commands Guide, or from the examples above.</p>
+        </details>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>© <span id="year"></span> Jott</p>
+      <div>
+        <a href="./support.html">Support</a>
+        <a href="./privacy.html">Privacy</a>
+        <a href="./terms.html">Terms</a>
+      </div>
+    </footer>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
