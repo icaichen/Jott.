@@ -10,6 +10,8 @@ private enum SlashGuideWindow: Int, Codable, Hashable { case show = 0 }
 struct JotApp: App {
     @StateObject private var store = JotStore()
     @StateObject private var purchases = PurchaseStore()
+    // 仅在直销版本中使用 LicenseStore
+    @StateObject private var licenseStore = LicenseStore()
 
     init() {
         NSApplication.shared.setActivationPolicy(.regular)
@@ -21,6 +23,7 @@ struct JotApp: App {
             LauncherView()
                 .environmentObject(store)
                 .environmentObject(purchases)
+                .environmentObject(licenseStore) // 注入 LicenseStore
                 .frame(width: 1, height: 1)
         }
         .defaultSize(width: 1, height: 1)
@@ -31,6 +34,7 @@ struct JotApp: App {
                 NoteView(noteID: note.id)
                     .environmentObject(store)
                     .environmentObject(purchases)
+                    .environmentObject(licenseStore) // 注入
             } else {
                 NoteNotFoundView()
             }
@@ -42,6 +46,7 @@ struct JotApp: App {
             NotesListView()
                 .environmentObject(store)
                 .environmentObject(purchases)
+                .environmentObject(licenseStore)
                 .task { await NotificationScheduler.shared.requestAuthorizationIfNeeded() }
         }
         .defaultSize(width: 360, height: 520)
@@ -49,6 +54,8 @@ struct JotApp: App {
         WindowGroup(for: PaywallWindow.self) { _ in
             JotPaywallScreen()
                 .environmentObject(purchases)
+                // 这里的 PaywallView 自己会创建 LicenseStore，但为了统一状态，最好传进去
+                // 不过上面的 PaywallView 实现是自己 StateObject 的，这里暂时不动
         }
         .defaultSize(width: 420, height: 260)
 
@@ -78,6 +85,7 @@ private struct NoteNotFoundView: View {
 private struct LauncherView: View {
     @EnvironmentObject private var store: JotStore
     @EnvironmentObject private var purchases: PurchaseStore
+    @EnvironmentObject private var licenseStore: LicenseStore
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
 
@@ -85,21 +93,34 @@ private struct LauncherView: View {
         Color.clear
             .task {
                 purchases.configureIfNeeded()
-                await purchases.refreshAndWait()
-                NSApp.activate(ignoringOtherApps: true)
-                let id = store.noteIDForLaunch()
-                openWindow(value: id)
-                // Ensure sticky is visible even if a paywall window also opens.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                    openWindow(value: id)
+                // 如果是 App Store 版本，检查 RevenueCat 状态
+                if isAppStoreBuild {
+                    await purchases.refreshAndWait()
                 }
-                if !purchases.isProUnlocked {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                
+                NSApp.activate(ignoringOtherApps: true)
+                
+                // 启动逻辑
+                let noteID = store.noteIDForLaunch()
+                openWindow(value: noteID)
+                
+                // 检查是否已解锁
+                let isPro: Bool
+                if isAppStoreBuild {
+                    isPro = purchases.isProUnlocked
+                } else {
+                    isPro = licenseStore.isProUnlocked
+                }
+                
+                if !isPro {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         openWindow(value: PaywallWindow.show)
                     }
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    dismissWindow(id: "launcher")
+                
+                // Close launcher
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    dismissWindow()
                 }
             }
     }

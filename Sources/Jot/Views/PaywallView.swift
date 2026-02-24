@@ -2,6 +2,7 @@ import SwiftUI
 
 struct JotPaywallScreen: View {
     @EnvironmentObject private var purchases: PurchaseStore
+    @StateObject private var licenseStore = LicenseStore() // 仅用于直销版本
 
     private var buyTitle: String {
         if let price = purchases.lifetimePriceText {
@@ -11,6 +12,18 @@ struct JotPaywallScreen: View {
     }
 
     var body: some View {
+        Group {
+            if isAppStoreBuild {
+                // App Store 版本界面
+                appStorePaywall
+            } else {
+                // 直销版本界面 (Paddle)
+                LicenseView(licenseStore: licenseStore)
+            }
+        }
+    }
+
+    private var appStorePaywall: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Jot Pro")
                 .font(.title2).bold()
