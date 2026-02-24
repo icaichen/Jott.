@@ -145,6 +145,32 @@ main {
   padding: 4.8rem 0 3rem;
 }
 
+.hero-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1.2rem;
+  align-items: center;
+}
+
+.hero-logo-panel {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 20px;
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+
+.hero-logo {
+  width: min(230px, 70%);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.12));
+}
+
 .eyebrow {
   margin: 0;
   color: var(--muted);
@@ -349,6 +375,14 @@ details p {
 @media (max-width: 860px) {
   .nav {
     display: none;
+  }
+
+  .hero-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-logo-panel {
+    min-height: 200px;
   }
 
   .grid-three {
